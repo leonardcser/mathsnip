@@ -10,7 +10,7 @@ enum LaTeXBackend: String {
 }
 
 // Set the active backend here
-let activeBackend: LaTeXBackend = .pix2tex
+let activeBackend: LaTeXBackend = .texo
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
@@ -19,6 +19,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var isProcessing = false
     var normalIcon: NSImage?
     var texoDaemonProcess: Process?
+    var texoDaemonReady = false
+    var texoDaemonStarting = false
+    let texoDaemonReadyLock = NSLock()
+    let texoDaemonReadyCondition = NSCondition()
 
     let texoSocketPath = "/tmp/mathsnip_texo.sock"
     let texoPidFile = "/tmp/mathsnip_texo.pid"
@@ -75,11 +79,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Texo Daemon Management
 
     func startTexoDaemon() {
-        // Check if daemon is already running
-        if isTexoDaemonRunning() {
-            print("Texo daemon already running")
+        texoDaemonReadyLock.lock()
+        defer { texoDaemonReadyLock.unlock() }
+
+        // Check if daemon is already running or starting
+        if texoDaemonReady || texoDaemonStarting {
             return
         }
+
+        // Check if an external daemon is already running
+        if isTexoDaemonRunning() {
+            print("Texo daemon already running")
+            texoDaemonReady = true
+            return
+        }
+
+        texoDaemonStarting = true
 
         // Clean up stale socket/pid files
         try? FileManager.default.removeItem(atPath: texoSocketPath)
@@ -92,6 +107,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard FileManager.default.fileExists(atPath: pythonPath),
               FileManager.default.fileExists(atPath: scriptPath) else {
             print("Texo not properly set up, skipping daemon start")
+            texoDaemonStarting = false
             return
         }
 
@@ -112,35 +128,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        // Monitor stdout for READY signal (non-blocking)
+        stdoutPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            if let str = String(data: data, encoding: .utf8), str.contains("READY") {
+                self?.texoDaemonReadyCondition.lock()
+                self?.texoDaemonReady = true
+                self?.texoDaemonStarting = false
+                self?.texoDaemonReadyCondition.broadcast()
+                self?.texoDaemonReadyCondition.unlock()
+                print("Texo daemon ready")
+                // Clear handler after ready
+                handle.readabilityHandler = nil
+            }
+        }
+
         do {
             try process.run()
             texoDaemonProcess = process
-
-            // Wait for READY signal (with timeout)
-            let readySignal = DispatchSemaphore(value: 0)
-            var gotReady = false
-
-            stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
-                let data = handle.availableData
-                if let str = String(data: data, encoding: .utf8), str.contains("READY") {
-                    gotReady = true
-                    readySignal.signal()
-                }
-            }
-
-            let timeout = DispatchTime.now() + .seconds(60)  // Model loading can take a while
-            if readySignal.wait(timeout: timeout) == .timedOut {
-                print("Texo daemon startup timed out")
-            } else if gotReady {
-                print("Texo daemon started successfully")
-            }
-
-            // Clear the handler after startup
-            stdoutPipe.fileHandleForReading.readabilityHandler = nil
-
+            print("Texo daemon starting in background...")
         } catch {
             print("Failed to start Texo daemon: \(error)")
+            texoDaemonStarting = false
         }
+    }
+
+    func waitForTexoDaemon(timeout: TimeInterval = 120) -> Bool {
+        texoDaemonReadyCondition.lock()
+        defer { texoDaemonReadyCondition.unlock() }
+
+        if texoDaemonReady {
+            return true
+        }
+
+        // Wait for daemon to become ready
+        let deadline = Date().addingTimeInterval(timeout)
+        while !texoDaemonReady {
+            if !texoDaemonReadyCondition.wait(until: deadline) {
+                // Timeout
+                print("Timeout waiting for Texo daemon")
+                return false
+            }
+        }
+        return true
     }
 
     func stopTexoDaemon() {
@@ -161,6 +191,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Clean up socket and PID files
         try? FileManager.default.removeItem(atPath: texoSocketPath)
         try? FileManager.default.removeItem(atPath: texoPidFile)
+
+        // Reset state
+        texoDaemonReady = false
+        texoDaemonStarting = false
     }
 
     func isTexoDaemonRunning() -> Bool {
@@ -317,23 +351,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func runTexo(_ imagePath: String) -> String? {
-        // Try socket connection first (fast path)
-        if let result = runTexoViaSocket(imagePath) {
-            return result
-        }
-
-        // Fallback: try to start daemon and retry
-        print("Socket connection failed, attempting to restart daemon...")
+        // Ensure daemon is started
         startTexoDaemon()
 
-        // Give daemon time to start, then retry
-        Thread.sleep(forTimeInterval: 2.0)
+        // Wait for daemon to be ready (blocks until ready or timeout)
+        if !waitForTexoDaemon(timeout: 120) {
+            print("Daemon not ready, falling back to single-shot inference")
+            return runTexoFallback(imagePath)
+        }
+
+        // Try socket connection
         if let result = runTexoViaSocket(imagePath) {
             return result
         }
 
-        // Last resort: run single-shot inference (slow)
-        print("Daemon unavailable, falling back to single-shot inference")
+        // Socket failed but daemon was "ready" - might have crashed
+        print("Socket connection failed, restarting daemon...")
+        stopTexoDaemon()
+        startTexoDaemon()
+
+        if waitForTexoDaemon(timeout: 120) {
+            if let result = runTexoViaSocket(imagePath) {
+                return result
+            }
+        }
+
+        // Last resort: single-shot inference
+        return runTexoFallback(imagePath)
+    }
+
+    func runTexoFallback(_ imagePath: String) -> String? {
+        print("Using single-shot inference (slow)")
         let dir = backendDir(.texo)
         let pythonPath = "\(dir)/venv/bin/python"
         let scriptPath = "\(dir)/inference_texo.py"
