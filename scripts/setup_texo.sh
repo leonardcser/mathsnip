@@ -42,7 +42,7 @@ fi
 
 # Create virtual environment with uv (Texo requires Python >= 3.11)
 echo "Creating virtual environment at $VENV_DIR..."
-uv venv "$VENV_DIR" --python 3.11
+uv venv "$VENV_DIR" --python 3.12
 
 # Install dependencies manually (Texo's pyproject.toml requires onnxruntime-gpu which isn't available on macOS)
 # Versions from Texo pyproject.toml
@@ -100,4 +100,4 @@ echo ""
 echo "Files installed:"
 echo "  - $VENV_DIR (Python environment)"
 echo "  - $TEXO_DIR (Texo source code)"
-echo "  - $MATHSNIP_DIR/inference.py (inference script)"
+echo "  - $MATHSNIP_DIR/inference_texo.py (inference script)"
