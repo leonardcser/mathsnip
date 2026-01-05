@@ -13,10 +13,17 @@
         }
         body {
             display: flex;
+            flex-direction: column;
+            padding: 12px;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .equation-area {
+            flex: 1;
+            display: flex;
             justify-content: center;
             align-items: center;
-            -webkit-user-select: all;
-            user-select: all;
+            min-height: 0;
         }
         .container {
             display: flex;
@@ -35,6 +42,74 @@
         .katex {
             font-family: 'New Computer Modern Math', 'New Computer Modern', 'Latin Modern Math', 'KaTeX_Main', serif !important;
         }
+        .copy-boxes {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .copy-row {
+            display: flex;
+            align-items: center;
+            height: 28px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: #f9fafb;
+            overflow: hidden;
+            cursor: pointer;
+            transition: border-color 0.15s;
+        }
+        .copy-row:hover {
+            border-color: #9ca3af;
+        }
+        .copy-row.copied {
+            background: #007AFF;
+            border-color: #007AFF;
+        }
+        .copy-row.copied .copy-content {
+            color: white;
+        }
+        .copy-row.copied .copy-btn {
+            border-left-color: rgba(255,255,255,0.3);
+            background: transparent;
+        }
+        .copy-row.copied .copy-btn svg {
+            color: white;
+        }
+        .copy-content {
+            flex: 1;
+            padding: 0 10px;
+            font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, monospace;
+            font-size: 12px;
+            color: #374151;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 26px;
+        }
+        .copy-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 100%;
+            border: none;
+            border-left: 1px solid #d1d5db;
+            background: #fff;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .copy-btn:hover {
+            background: #f3f4f6;
+        }
+        .copy-btn:active {
+            background: #e5e7eb;
+        }
+        .copy-btn svg {
+            width: 14px;
+            height: 14px;
+            color: #6b7280;
+        }
     </style>
     <script>
         function renderLatex() {
@@ -51,15 +126,21 @@
                 container.textContent = 'Error rendering LaTeX: ' + e.message;
             }
 
+            // Set copy box content
+            document.getElementById('raw-content').textContent = latex;
+            document.getElementById('inline-content').textContent = '$' + latex + '$';
+            document.getElementById('block-content').textContent = '$$' + latex + '$$';
+
             scaleToFit();
         }
 
         function scaleToFit() {
             const container = document.querySelector('.container');
-            if (!container) return;
+            const equationArea = document.querySelector('.equation-area');
+            if (!container || !equationArea) return;
 
-            const maxW = window.innerWidth - 24;
-            const maxH = window.innerHeight - 24;
+            const maxW = equationArea.clientWidth - 24;
+            const maxH = equationArea.clientHeight - 24;
             const w = container.scrollWidth;
             const h = container.scrollHeight;
 
@@ -70,12 +151,50 @@
             container.style.opacity = '1';
         }
 
+        function copyRow(row) {
+            const contentEl = row.querySelector('.copy-content');
+            const button = row.querySelector('.copy-btn');
+            const text = contentEl.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                // Remove copied state from all rows
+                document.querySelectorAll('.copy-row.copied').forEach(r => {
+                    r.classList.remove('copied');
+                    r.querySelector('.copy-btn').innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>';
+                });
+                // Add copied state to clicked row
+                row.classList.add('copied');
+                button.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>';
+            });
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             document.fonts.ready.then(renderLatex);
         });
     </script>
 </head>
 <body>
-    <div class="container"></div>
+    <div class="equation-area">
+        <div class="container"></div>
+    </div>
+    <div class="copy-boxes">
+        <div class="copy-row" onclick="copyRow(this)" title="Copy raw LaTeX">
+            <span class="copy-content" id="raw-content"></span>
+            <button class="copy-btn">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+            </button>
+        </div>
+        <div class="copy-row" onclick="copyRow(this)" title="Copy inline format">
+            <span class="copy-content" id="inline-content"></span>
+            <button class="copy-btn">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+            </button>
+        </div>
+        <div class="copy-row" onclick="copyRow(this)" title="Copy block format">
+            <span class="copy-content" id="block-content"></span>
+            <button class="copy-btn">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+            </button>
+        </div>
+    </div>
 </body>
 </html>

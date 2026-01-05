@@ -9,7 +9,7 @@ class PreviewPanel: NSPanel, WKNavigationDelegate {
 
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 120),
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 210),
             styleMask: [.nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -51,7 +51,7 @@ class PreviewPanel: NSPanel, WKNavigationDelegate {
         let screenRect = buttonWindow.convertToScreen(buttonRect)
 
         let panelWidth: CGFloat = 400
-        let panelHeight: CGFloat = 100
+        let panelHeight: CGFloat = 210
 
         let x = screenRect.midX - panelWidth / 2
         let y = screenRect.minY - panelHeight - 4
