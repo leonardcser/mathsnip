@@ -68,13 +68,8 @@ cp "$SCRIPT_DIR/inference_texo.py" "$MATHSNIP_DIR/inference_texo.py"
 
 # Pre-download the model
 echo ""
-echo "Would you like to pre-download the FormulaNet model? (recommended)"
-echo "This will download ~500MB but makes first use instant."
-read -p "Download now? [Y/n] " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-    echo "Downloading model..."
-    "$VENV_DIR/bin/python" -c "
+echo "Downloading model..."
+"$VENV_DIR/bin/python" -c "
 import sys
 sys.path.insert(0, '$TEXO_DIR')
 from pathlib import Path
@@ -91,7 +86,6 @@ snapshot_download(
 )
 print('Done!')
 "
-fi
 
 echo ""
 echo "Setup complete!"
