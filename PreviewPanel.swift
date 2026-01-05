@@ -9,7 +9,7 @@ class PreviewPanel: NSPanel, WKNavigationDelegate {
 
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 210),
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 245),
             styleMask: [.nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -51,7 +51,7 @@ class PreviewPanel: NSPanel, WKNavigationDelegate {
         let screenRect = buttonWindow.convertToScreen(buttonRect)
 
         let panelWidth: CGFloat = 400
-        let panelHeight: CGFloat = 210
+        let panelHeight: CGFloat = 245
 
         let x = screenRect.midX - panelWidth / 2
         let y = screenRect.minY - panelHeight - 4
@@ -98,6 +98,11 @@ class PreviewPanel: NSPanel, WKNavigationDelegate {
         let jsSource = resourceURL.appendingPathComponent("katex.min.js")
         let jsDest = tmpBase.appendingPathComponent("katex.min.js")
         try? fm.copyItem(at: jsSource, to: jsDest)
+
+        // Copy tex2typst JS to temp
+        let typstJsSource = resourceURL.appendingPathComponent("tex2typst.min.js")
+        let typstJsDest = tmpBase.appendingPathComponent("tex2typst.min.js")
+        try? fm.copyItem(at: typstJsSource, to: typstJsDest)
 
         // Copy fonts directory to temp
         let fontsSource = resourceURL.appendingPathComponent("fonts")

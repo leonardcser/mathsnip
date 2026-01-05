@@ -22,6 +22,7 @@ cp assets/AppIcon.icns "${APP_BUNDLE}/Contents/Resources/"
 cp assets/preview.html "${APP_BUNDLE}/Contents/Resources/"
 cp assets/katex.min.css "${APP_BUNDLE}/Contents/Resources/"
 cp assets/katex.min.js "${APP_BUNDLE}/Contents/Resources/"
+cp assets/tex2typst.min.js "${APP_BUNDLE}/Contents/Resources/"
 cp -r assets/fonts "${APP_BUNDLE}/Contents/Resources/"
 
 # Compile Swift code

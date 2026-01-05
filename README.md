@@ -1,13 +1,17 @@
 # MathSnip
 
-A macOS menu bar app that captures mathematical equations from the screen and
-converts them to LaTeX.
+<p align="center">
+    <img src="assets/preview.png" width=512></img>
+</p>
+
+A macOS menu bar app frontend for converting mathematical equations into
+different formats (LaTeX and Typst).
 
 ## Requirements
 
 - macOS 13.0 or later
 - Swift compiler
-- `pix2tex` - equation-to-LaTeX conversion (`uv pip install pix2tex`)
+- `pix2tex` - equation-to-LaTeX conversion (`uv tool install pix2tex`)
 
 ## Setup
 

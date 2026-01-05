@@ -3,6 +3,7 @@
   <head>
     <link rel="stylesheet" href="katex.min.css" />
     <script src="katex.min.js"></script>
+    <script src="tex2typst.min.js"></script>
     <style>
       * {
         margin: 0;
@@ -64,7 +65,6 @@
         background: #f9fafb;
         overflow: hidden;
         cursor: pointer;
-        transition: border-color 0.15s;
       }
       .copy-row:hover {
         border-color: #9ca3af;
@@ -105,7 +105,6 @@
         border-left: 1px solid #d1d5db;
         background: #fff;
         cursor: pointer;
-        transition: background 0.15s;
       }
       .copy-btn:hover {
         background: #f3f4f6;
@@ -140,6 +139,16 @@
           "$" + latex + "$";
         document.getElementById("block-content").textContent =
           "$$" + latex + "$$";
+
+        // Convert to Typst
+        try {
+          const typst = tex2typst(latex);
+          document.getElementById("typst-content").textContent =
+            "$" + typst + "$";
+        } catch (e) {
+          document.getElementById("typst-content").textContent =
+            "(conversion failed)";
+        }
 
         scaleToFit();
       }
@@ -213,6 +222,17 @@
       </div>
       <div class="copy-row" onclick="copyRow(this)" title="Copy block format">
         <span class="copy-content" id="block-content"></span>
+        <button class="copy-btn">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+            <path
+              d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"
+            />
+          </svg>
+        </button>
+      </div>
+      <div class="copy-row" onclick="copyRow(this)" title="Copy Typst format">
+        <span class="copy-content" id="typst-content"></span>
         <button class="copy-btn">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
