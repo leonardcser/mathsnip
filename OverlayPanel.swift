@@ -30,6 +30,9 @@ class OverlayPanel: NSWindow {
     func configureForOverlay() {
         guard NSScreen.main != nil else { return }
 
+        // Activate app to gain cursor control
+        NSApp.activate(ignoringOtherApps: true)
+
         // Window level above menubar
         level = .screenSaver
 
@@ -46,7 +49,6 @@ class OverlayPanel: NSWindow {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
-        ignoresMouseEvents = true  // We handle events via CGEvent tap
 
         // Don't show in window switcher or mission control
         collectionBehavior = [
@@ -239,11 +241,24 @@ class OverlayView: NSView {
         super.viewDidMoveToWindow()
 
         // Initialize crosshair at current mouse position
-        if NSScreen.main != nil {
+        if window != nil, NSScreen.main != nil {
             let cgMouseLocation = CGEvent(source: nil)?.location ?? .zero
             currentPoint = viewPointFromScreenPoint(cgMouseLocation)
+            NSCursor.crosshair.push()
             needsDisplay = true
         }
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        // Pop cursor when view is removed from window
+        if newWindow == nil && window != nil {
+            NSCursor.pop()
+        }
+    }
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .crosshair)
     }
 
     override func draw(_ dirtyRect: NSRect) {
