@@ -53,19 +53,19 @@ Click the MathSnip menu bar icon to start snipping, or right-click for the conte
 
 Two ML backends for equation recognition:
 
-**pix2tex** (default)
-- Lightweight, fast
-- External tool: `pix2tex [image]`
-- Paths searched: `~/.local/bin/pix2tex`, `/usr/local/bin/pix2tex`, `/opt/homebrew/bin/pix2tex`
-- Output format: `"filepath: latex_result"` (parser extracts after colon)
-
-**Texo** (high quality)
+**Texo** (default)
 - Better accuracy, uses FormulaNet model
 - Persistent daemon for performance
 - Socket-based IPC (`/tmp/mathsnip_texo.sock`)
 - Non-blocking startup: daemon boots in background, waits for "READY" signal on stdout
 - Falls back to single-shot inference if daemon unavailable
 - Setup via `./scripts/setup_texo.sh`
+
+**pix2tex**
+- Lightweight, fast
+- External tool: `pix2tex [image]`
+- Paths searched: `~/.local/bin/pix2tex`, `/usr/local/bin/pix2tex`, `/opt/homebrew/bin/pix2tex`
+- Output format: `"filepath: latex_result"` (parser extracts after colon)
 
 Backend is set via `let activeBackend: LaTeXBackend` in AppDelegate.swift:13
 

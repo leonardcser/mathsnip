@@ -60,12 +60,13 @@ entry from the permission lists and add the app again from its new location.
 
 ## Backends
 
-| Backend | License | Quality | Setup |
-|---------|---------|---------|-------|
-| **pix2tex** (default) | MIT | Good | `uv tool install pix2tex` |
-| **Texo** | AGPL | Excellent | `./scripts/setup_texo.sh` |
+| Backend            | License | Quality   | Setup                     |
+| ------------------ | ------- | --------- | ------------------------- |
+| **Texo** (default) | AGPL    | Excellent | `./scripts/setup_texo.sh` |
+| **pix2tex**        | MIT     | Good      | `uv tool install pix2tex` |
 
-To use **Texo**, run the setup script, then change `let activeBackend: LaTeXBackend = .pix2tex` to `.texo` in `AppDelegate.swift` and rebuild.
+To use **pix2tex**, change `let activeBackend: LaTeXBackend = .texo` to
+`.pix2tex` in `AppDelegate.swift` and rebuild.
 
 Note: Using Texo subjects your use to AGPL-3.0.
 
