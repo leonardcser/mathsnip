@@ -25,4 +25,16 @@ This creates `MathSnip.app` in the current directory.
 
 ## Permissions
 
-On first run, macOS will prompt you to allow screen recording access. Grant permission for the app to function properly.
+MathSnip requires two macOS permissions to function:
+
+### Accessibility Permission
+Required for the snipping overlay to capture mouse and keyboard events. Without this permission, the overlay cannot detect your selection.
+
+### Screen Recording Permission
+Required to capture the selected area of the screen. Without this permission, the app cannot capture the equation image.
+
+On first use, the app will check for these permissions and prompt you to grant them if missing. You can also manually enable them in:
+- **System Settings → Privacy & Security → Accessibility** - Add MathSnip
+- **System Settings → Privacy & Security → Screen Recording** - Add MathSnip
+
+**Note:** If you move or copy the app (e.g., to `/Applications`), macOS treats it as a new application and you'll need to re-grant permissions. Remove the old entry from the permission lists and add the app again from its new location.

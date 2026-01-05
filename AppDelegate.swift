@@ -1,5 +1,6 @@
 import Cocoa
 import ScreenCaptureKit
+import ApplicationServices
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
@@ -73,13 +74,97 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.terminate(nil)
     }
 
+    // MARK: - Permission Checks
+
+    func checkAccessibilityPermission() -> Bool {
+        return AXIsProcessTrusted()
+    }
+
+    func checkScreenCapturePermission() -> Bool {
+        return CGPreflightScreenCaptureAccess()
+    }
+
+    func showPermissionAlert(title: String, message: String, settingsAction: @escaping () -> Void) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "Cancel")
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            settingsAction()
+        }
+    }
+
+    func openAccessibilitySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func openScreenCaptureSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func findPix2TexPath() -> String? {
+        let home = NSHomeDirectory()
+        let possiblePaths = [
+            "\(home)/.local/bin/pix2tex",
+            "/usr/local/bin/pix2tex",
+            "/opt/homebrew/bin/pix2tex"
+        ]
+
+        for path in possiblePaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+        return nil
+    }
+
+    func showPix2TexNotFoundAlert() {
+        let alert = NSAlert()
+        alert.messageText = "pix2tex Not Found"
+        alert.informativeText = "MathSnip requires pix2tex to convert equations to LaTeX. Please install it using:\n\npip install pix2tex\n\nThen ensure it's available in one of these locations:\n• ~/.local/bin/pix2tex\n• /usr/local/bin/pix2tex\n• /opt/homebrew/bin/pix2tex"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+
     func startSnipping() {
+        // Check pix2tex is installed first
+        if findPix2TexPath() == nil {
+            showPix2TexNotFoundAlert()
+            return
+        }
+
+        // Check accessibility permission (required for event tap)
+        if !checkAccessibilityPermission() {
+            showPermissionAlert(
+                title: "Accessibility Permission Required",
+                message: "MathSnip needs Accessibility access to capture mouse and keyboard events for the snipping overlay. Please grant permission in System Settings.",
+                settingsAction: openAccessibilitySettings
+            )
+            return
+        }
+
+        // Check screen capture permission
+        if !checkScreenCapturePermission() {
+            showPermissionAlert(
+                title: "Screen Recording Permission Required",
+                message: "MathSnip needs Screen Recording access to capture the selected area. Please grant permission in System Settings.",
+                settingsAction: openScreenCaptureSettings
+            )
+            return
+        }
+
+        // All permissions granted, open the overlay
         overlayPanel?.close()
         overlayPanel = OverlayPanel(appDelegate: self)
-
-        // Configure BEFORE showing (like the SwiftUI example)
         overlayPanel?.configureForOverlay()
-
         overlayPanel?.makeKeyAndOrderFront(nil)
     }
 
@@ -176,23 +261,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func runPix2Tex(_ imagePath: String) -> String? {
         let process = Process()
 
-        // Try common paths for pix2tex
-        let home = NSHomeDirectory()
-        let possiblePaths = [
-            "\(home)/.local/bin/pix2tex",
-            "/usr/local/bin/pix2tex",
-            "/opt/homebrew/bin/pix2tex"
-        ]
-
-        var pix2texPath: String?
-        for path in possiblePaths {
-            if FileManager.default.fileExists(atPath: path) {
-                pix2texPath = path
-                break
-            }
-        }
-
-        guard let execPath = pix2texPath else {
+        guard let execPath = findPix2TexPath() else {
             print("pix2tex not found")
             return nil
         }
