@@ -11,7 +11,7 @@ different formats (LaTeX and Typst).
 
 - macOS 13.0 or later
 - Swift compiler
-- `pix2tex` - equation-to-LaTeX conversion (`uv tool install pix2tex`)
+- LaTeX backend (see **Backends** section below)
 
 ## Setup
 
@@ -57,3 +57,19 @@ them if missing. You can also manually enable them in:
 **Note:** If you move or copy the app (e.g., to `/Applications`), macOS treats
 it as a new application and you'll need to re-grant permissions. Remove the old
 entry from the permission lists and add the app again from its new location.
+
+## Backends
+
+| Backend | License | Quality | Setup |
+|---------|---------|---------|-------|
+| **pix2tex** (default) | MIT | Good | `uv tool install pix2tex` |
+| **Texo** | AGPL | Excellent | `./scripts/setup_texo.sh` |
+
+To use **Texo**, run the setup script, then change `let activeBackend: LaTeXBackend = .pix2tex` to `.texo` in `AppDelegate.swift` and rebuild.
+
+Note: Using Texo subjects your use to AGPL-3.0.
+
+## License
+
+MIT License, except `scripts/inference_texo.py` which is AGPL-3.0 (it imports
+from [Texo](https://github.com/alephpi/Texo), an AGPL project).
