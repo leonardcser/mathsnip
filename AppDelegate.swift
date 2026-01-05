@@ -5,6 +5,7 @@ import ApplicationServices
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var overlayPanel: OverlayPanel?
+    var previewPanel: PreviewPanel?
     var isProcessing = false
     var normalIcon: NSImage?
 
@@ -125,6 +126,65 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return nil
     }
 
+    func findKatexPath() -> String? {
+        let home = NSHomeDirectory()
+        let possiblePaths = [
+            // pnpm
+            "\(home)/Library/pnpm/katex",
+            "\(home)/.local/share/pnpm/katex",
+            // npm
+            "\(home)/.npm-global/bin/katex",
+            "/usr/local/lib/node_modules/katex/cli.js",
+            "/opt/homebrew/lib/node_modules/katex/cli.js",
+            // direct bin
+            "/usr/local/bin/katex",
+            "/opt/homebrew/bin/katex"
+        ]
+
+        for path in possiblePaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+        return nil
+    }
+
+    func runKatex(_ latex: String) -> String? {
+        guard let execPath = findKatexPath() else {
+            print("katex not found")
+            return nil
+        }
+
+        let process = Process()
+        if execPath.hasSuffix(".js") {
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = ["node", execPath, "-d"]
+        } else {
+            process.executableURL = URL(fileURLWithPath: execPath)
+            process.arguments = ["-d"]
+        }
+
+        let stdinPipe = Pipe()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardInput = stdinPipe
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        do {
+            try process.run()
+            stdinPipe.fileHandleForWriting.write(latex.data(using: .utf8)!)
+            try stdinPipe.fileHandleForWriting.close()
+            process.waitUntilExit()
+
+            let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            print("Failed to run katex: \(error)")
+            return nil
+        }
+    }
+
     func showPix2TexNotFoundAlert() {
         let alert = NSAlert()
         alert.messageText = "pix2tex Not Found"
@@ -181,6 +241,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setIconLoading()
 
         Task {
+            var capturedLatex: String?
+            var katexHtml: String?
+
             do {
                 let imagePath = try await captureScreenRegion(rect)
 
@@ -188,6 +251,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     let result = runPix2Tex(path)
 
                     if let latex = result, !latex.isEmpty {
+                        capturedLatex = latex
+                        katexHtml = runKatex(latex)
+
                         await MainActor.run {
                             let pasteboard = NSPasteboard.general
                             pasteboard.clearContents()
@@ -201,13 +267,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 print("Error: \(error)")
             }
 
+            let finalLatex = capturedLatex
+            let finalHtml = katexHtml
+
             await MainActor.run {
                 self.isProcessing = false
                 self.setIconNormal()
                 self.overlayPanel?.close()
                 self.overlayPanel = nil
+
+                if let latex = finalLatex, let html = finalHtml {
+                    self.showPreview(latex: latex, html: html)
+                }
             }
         }
+    }
+
+    func showPreview(latex: String, html: String) {
+        previewPanel?.dismiss()
+        previewPanel = PreviewPanel()
+        previewPanel?.showBelow(statusItem: statusItem, latex: latex, html: html)
     }
 
     func captureScreenRegion(_ rect: NSRect) async throws -> String? {
@@ -289,6 +368,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 return latex
             }
+            print("pix2tex output: \(output ?? "nil")")
 
             return output
         } catch {

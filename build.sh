@@ -22,9 +22,11 @@ cp assets/AppIcon.icns "${APP_BUNDLE}/Contents/Resources/"
 swiftc -o "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}" \
     -framework Cocoa \
     -framework ScreenCaptureKit \
+    -framework WebKit \
     main.swift \
     AppDelegate.swift \
-    OverlayPanel.swift
+    OverlayPanel.swift \
+    PreviewPanel.swift
 
 # Copy Info.plist
 cp Info.plist "${APP_BUNDLE}/Contents/"

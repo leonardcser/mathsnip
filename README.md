@@ -6,7 +6,8 @@ A macOS menu bar app that captures mathematical equations from the screen and co
 
 - macOS 13.0 or later
 - Swift compiler
-- `pix2tex` installed on your system (for equation-to-LaTeX conversion)
+- `pix2tex` - equation-to-LaTeX conversion (`pip install pix2tex`)
+- `katex` - LaTeX preview rendering (`pnpm add -g katex`)
 
 ## Build
 
