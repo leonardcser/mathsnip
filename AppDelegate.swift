@@ -76,6 +76,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func startSnipping() {
         overlayPanel?.close()
         overlayPanel = OverlayPanel(appDelegate: self)
+
+        // Configure BEFORE showing (like the SwiftUI example)
+        overlayPanel?.configureForOverlay()
+
         overlayPanel?.makeKeyAndOrderFront(nil)
     }
 

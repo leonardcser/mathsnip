@@ -1,7 +1,7 @@
 import Cocoa
 import CoreGraphics
 
-class OverlayPanel: NSPanel {
+class OverlayPanel: NSWindow {
     weak var appDelegate: AppDelegate?
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -11,21 +11,42 @@ class OverlayPanel: NSPanel {
 
         super.init(
             contentRect: screenFrame,
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
 
         self.appDelegate = appDelegate
 
-        // Panel configuration - use a very high level to be above menubar
-        level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
+        // Create overlay view
+        let overlayView = OverlayView(frame: screenFrame)
+        overlayView.overlayPanel = self
+        contentView = overlayView
+
+        setupEventTap()
+    }
+
+    // Called from AppDelegate BEFORE showing the window
+    func configureForOverlay() {
+        guard NSScreen.main != nil else { return }
+
+        // Window level above menubar
+        level = .screenSaver
+
+        // Set position to cover entire screen including menubar
+        setFrameOrigin(NSPoint(x: 0, y: 0))
+
+        // Remove title bar elements
+        styleMask.remove(.titled)
+        standardWindowButton(.closeButton)?.isHidden = true
+        standardWindowButton(.miniaturizeButton)?.isHidden = true
+        standardWindowButton(.zoomButton)?.isHidden = true
+
+        // Visual properties
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
         ignoresMouseEvents = true  // We handle events via CGEvent tap
-        acceptsMouseMovedEvents = false
-        isReleasedWhenClosed = false
 
         // Don't show in window switcher or mission control
         collectionBehavior = [
@@ -35,16 +56,11 @@ class OverlayPanel: NSPanel {
             .fullScreenAuxiliary
         ]
 
-        isFloatingPanel = true
-        becomesKeyOnlyIfNeeded = false
-
-        // Create overlay view
-        let overlayView = OverlayView(frame: screenFrame)
-        overlayView.overlayPanel = self
-        contentView = overlayView
-
-        setupEventTap()
+        isReleasedWhenClosed = false
     }
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
 
     private func setupEventTap() {
         let eventMask: CGEventMask = (1 << CGEventType.mouseMoved.rawValue) |
@@ -143,9 +159,6 @@ class OverlayPanel: NSPanel {
     deinit {
         cleanup()
     }
-
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { false }
 }
 
 class OverlayView: NSView {
