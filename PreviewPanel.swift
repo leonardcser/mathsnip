@@ -1,10 +1,11 @@
 import Cocoa
 import WebKit
 
-class PreviewPanel: NSPanel {
+class PreviewPanel: NSPanel, WKNavigationDelegate {
     private var webView: WKWebView!
     private var localMonitor: Any?
     private var globalMonitor: Any?
+    private var tempDir: URL?
 
     init() {
         super.init(
@@ -31,16 +32,18 @@ class PreviewPanel: NSPanel {
         contentView = container
 
         let config = WKWebViewConfiguration()
+        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
         webView = WKWebView(frame: container.bounds, configuration: config)
         webView.autoresizingMask = [.width, .height]
         webView.wantsLayer = true
         webView.layer?.cornerRadius = 8
         webView.layer?.masksToBounds = true
         webView.setValue(false, forKey: "drawsBackground")
+        webView.navigationDelegate = self
         container.addSubview(webView)
     }
 
-    func showBelow(statusItem: NSStatusItem, latex: String, html: String) {
+    func showBelow(statusItem: NSStatusItem, latex: String) {
         guard let button = statusItem.button,
               let buttonWindow = button.window else { return }
 
@@ -56,73 +59,70 @@ class PreviewPanel: NSPanel {
         setContentSize(NSSize(width: panelWidth, height: panelHeight))
         setFrameOrigin(NSPoint(x: x, y: y))
 
-        let htmlContent = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-            <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                html, body {
-                    width: 100%;
-                    height: 100%;
-                    background: white;
-                    overflow: hidden;
-                }
-                body {
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    -webkit-user-select: all;
-                    user-select: all;
-                }
-                .container {
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    transform-origin: center center;
-                    opacity: 0;
-                    transition: opacity 0.1s ease-in;
-                }
-                .katex-display {
-                    margin: 0 !important;
-                }
-                .katex-display > .katex {
-                    white-space: nowrap;
-                }
-                .katex {
-                    font-family: 'New Computer Modern Math', 'New Computer Modern', 'Latin Modern Math', 'KaTeX_Main', serif !important;
-                }
-            </style>
-            <script>
-                function scaleToFit() {
-                    const container = document.querySelector('.container');
-                    if (!container) return;
+        // Get bundle resource directory
+        guard let resourceURL = Bundle.main.resourceURL else {
+            print("No resource URL")
+            return
+        }
 
-                    const maxW = window.innerWidth - 24;
-                    const maxH = window.innerHeight - 24;
-                    const w = container.scrollWidth;
-                    const h = container.scrollHeight;
+        // Read HTML template and replace placeholder
+        let htmlURL = resourceURL.appendingPathComponent("preview.html")
+        guard var htmlTemplate = try? String(contentsOf: htmlURL, encoding: .utf8) else {
+            print("Failed to read: \(htmlURL.path)")
+            return
+        }
 
-                    if (w > 0 && h > 0) {
-                        const scale = Math.min(1.2, maxW / w, maxH / h);
-                        container.style.transform = 'scale(' + scale + ')';
-                    }
-                    container.style.opacity = '1';
-                }
-                document.fonts.ready.then(scaleToFit);
-            </script>
-        </head>
-        <body>
-            <div class="container">\(html)</div>
-        </body>
-        </html>
-        """
+        // Escape LaTeX for safe insertion into JavaScript string
+        let escapedLatex = latex
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
 
-        webView.loadHTMLString(htmlContent, baseURL: nil)
+        htmlTemplate = htmlTemplate.replacingOccurrences(of: "{{LATEX}}", with: escapedLatex)
+
+        // Write modified HTML to cache directory
+        let fm = FileManager.default
+        let cacheDir = fm.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        let tmpBase = cacheDir.appendingPathComponent("com.mathsnip.preview")
+        try? fm.removeItem(at: tmpBase)
+        try? fm.createDirectory(at: tmpBase, withIntermediateDirectories: true)
+        tempDir = tmpBase
+
+        // Copy CSS to temp
+        let cssSource = resourceURL.appendingPathComponent("katex.min.css")
+        let cssDest = tmpBase.appendingPathComponent("katex.min.css")
+        try? fm.copyItem(at: cssSource, to: cssDest)
+
+        // Copy JS to temp
+        let jsSource = resourceURL.appendingPathComponent("katex.min.js")
+        let jsDest = tmpBase.appendingPathComponent("katex.min.js")
+        try? fm.copyItem(at: jsSource, to: jsDest)
+
+        // Copy fonts directory to temp
+        let fontsSource = resourceURL.appendingPathComponent("fonts")
+        let fontsDest = tmpBase.appendingPathComponent("fonts")
+        try? fm.copyItem(at: fontsSource, to: fontsDest)
+
+        // Write HTML to temp
+        let htmlDest = tmpBase.appendingPathComponent("preview.html")
+        try? htmlTemplate.write(to: htmlDest, atomically: true, encoding: .utf8)
+
+        webView.loadFileURL(htmlDest, allowingReadAccessTo: tmpBase)
         orderFrontRegardless()
-
         setupDismissMonitors()
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Content loaded
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        print("WebView failed: \(error)")
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        print("WebView provisional failed: \(error)")
     }
 
     private func setupDismissMonitors() {
@@ -149,5 +149,11 @@ class PreviewPanel: NSPanel {
             globalMonitor = nil
         }
         orderOut(nil)
+
+        // Cleanup temp files
+        if let dir = tempDir {
+            try? FileManager.default.removeItem(at: dir)
+            tempDir = nil
+        }
     }
 }

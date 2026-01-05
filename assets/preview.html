@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="katex.min.css">
+    <script src="katex.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%;
+            height: 100%;
+            background: white;
+            overflow: hidden;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            -webkit-user-select: all;
+            user-select: all;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform-origin: center center;
+            opacity: 0;
+            transition: opacity 0.1s ease-in;
+        }
+        .katex-display {
+            margin: 0 !important;
+        }
+        .katex-display > .katex {
+            white-space: nowrap;
+        }
+        .katex {
+            font-family: 'New Computer Modern Math', 'New Computer Modern', 'Latin Modern Math', 'KaTeX_Main', serif !important;
+        }
+    </style>
+    <script>
+        function renderLatex() {
+            const container = document.querySelector('.container');
+            if (!container) return;
+
+            const latex = '{{LATEX}}';
+            try {
+                katex.render(latex, container, {
+                    displayMode: true,
+                    throwOnError: false
+                });
+            } catch (e) {
+                container.textContent = 'Error rendering LaTeX: ' + e.message;
+            }
+
+            scaleToFit();
+        }
+
+        function scaleToFit() {
+            const container = document.querySelector('.container');
+            if (!container) return;
+
+            const maxW = window.innerWidth - 24;
+            const maxH = window.innerHeight - 24;
+            const w = container.scrollWidth;
+            const h = container.scrollHeight;
+
+            if (w > 0 && h > 0) {
+                const scale = Math.min(1.2, maxW / w, maxH / h);
+                container.style.transform = 'scale(' + scale + ')';
+            }
+            container.style.opacity = '1';
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            document.fonts.ready.then(renderLatex);
+        });
+    </script>
+</head>
+<body>
+    <div class="container"></div>
+</body>
+</html>

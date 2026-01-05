@@ -18,6 +18,12 @@ cp assets/icon.png "${APP_BUNDLE}/Contents/Resources/"
 cp assets/icon@2x.png "${APP_BUNDLE}/Contents/Resources/"
 cp assets/AppIcon.icns "${APP_BUNDLE}/Contents/Resources/"
 
+# Copy preview assets
+cp assets/preview.html "${APP_BUNDLE}/Contents/Resources/"
+cp assets/katex.min.css "${APP_BUNDLE}/Contents/Resources/"
+cp assets/katex.min.js "${APP_BUNDLE}/Contents/Resources/"
+cp -r assets/fonts "${APP_BUNDLE}/Contents/Resources/"
+
 # Compile Swift code
 swiftc -o "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}" \
     -framework Cocoa \
