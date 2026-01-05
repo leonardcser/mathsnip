@@ -2,103 +2,148 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Overview
 
-MathSnip is a macOS menu bar app that captures mathematical equations from the screen and converts them to LaTeX. The app uses a snipping overlay (similar to macOS screenshot tool) to let users select an equation area, then uses `pix2tex` (Python package) to perform OCR on the image and convert it to LaTeX, which is copied to the clipboard. A preview panel displays the rendered equation using KaTeX.
+MathSnip is a macOS menu bar application that converts mathematical equations to LaTeX and Typst formats using image recognition. It captures equation images from the screen and processes them through pluggable ML backends.
 
-## Build Commands
+## Building and Running
 
+### Build
 ```bash
-# Build the app (creates MathSnip.app in current directory)
 ./build.sh
 ```
 
-The build script:
-- Compiles all Swift files using `swiftc` with Cocoa, ScreenCaptureKit, and WebKit frameworks
-- Creates macOS app bundle structure
-- Copies icon assets and preview HTML/CSS/JS/fonts to Resources
-- Produces a standalone `.app` that can be run directly
+Creates `MathSnip.app` in the current directory.
 
-## Runtime Dependencies
+### Install
+```bash
+cp -R MathSnip.app /Applications/
+```
 
-The app requires external tools to be installed:
-- `pix2tex` - Python package for equation OCR (`pip install pix2tex`)
-  - Searched in: `~/.local/bin/pix2tex`, `/usr/local/bin/pix2tex`, `/opt/homebrew/bin/pix2tex`
-- `katex` - For LaTeX rendering in preview (bundled in assets, no runtime dependency)
+### Run
+Click the MathSnip menu bar icon to start snipping, or right-click for the context menu.
 
 ## Architecture
 
-### Component Overview
+### Core Components
 
-The app consists of 4 main Swift files:
+**AppDelegate.swift** - Main application controller
+- Status bar menu management
+- Snipping flow orchestration (`startSnipping()` → `handleSelection()` → `captureAndProcess()`)
+- Backend abstraction and switching between pix2tex and Texo
+- Texo daemon lifecycle management (non-blocking startup, socket-based communication)
+- Permission checking (Accessibility, Screen Recording)
+- Screenshot capture using ScreenCaptureKit with scaling and cropping
 
-1. **main.swift** - Entry point, sets app activation policy to `.accessory` (menu bar app, no dock icon)
+**OverlayPanel.swift & OverlayView.swift** - Full-screen selection overlay
+- CGEvent tap for capturing mouse/keyboard events during snipping
+- Event tap requires Accessibility permission
+- Coordinate conversion between CG (origin top-left) and NS (origin bottom-left) systems
+- Selection visualization (semi-transparent overlay, white border, crosshair)
+- Minimum selection size check (10×10 pixels)
 
-2. **AppDelegate.swift** - Core application logic
-   - Manages menu bar status item and menu
-   - Permission checks (Accessibility + Screen Recording required)
-   - Orchestrates snipping flow: overlay → capture → pix2tex → preview
-   - Icon state management (normal/loading)
-   - Screen capture using ScreenCaptureKit API
-   - Process management for pix2tex execution
+**PreviewPanel.swift** - LaTeX/Typst preview window
+- Floating panel below menu bar icon
+- Uses WebKit to render math with KaTeX
+- Includes tex2typst.js for format conversion between LaTeX and Typst
+- Dynamically loads bundle resources to temp directory for security
+- Dismisses on click outside
 
-3. **OverlayPanel.swift** - Fullscreen snipping interface
-   - Window level `.screenSaver` to cover menubar
-   - CGEvent tap to intercept all mouse/keyboard events (requires Accessibility permission)
-   - Crosshair cursor + selection rectangle UI
-   - Coordinate system conversion: CG coords (top-left origin) ↔ NS coords (bottom-left origin)
-   - ESC key cancels snipping
+### Backend System
 
-4. **PreviewPanel.swift** - LaTeX preview popup
-   - WKWebView-based panel positioned below menu bar icon
-   - Loads HTML template with KaTeX, injects captured LaTeX
-   - Copies resources (CSS/JS/fonts) to cache directory for WebKit file access
-   - Auto-dismisses on click outside
+Two ML backends for equation recognition:
 
-### Key Workflows
+**pix2tex** (default)
+- Lightweight, fast
+- External tool: `pix2tex [image]`
+- Paths searched: `~/.local/bin/pix2tex`, `/usr/local/bin/pix2tex`, `/opt/homebrew/bin/pix2tex`
+- Output format: `"filepath: latex_result"` (parser extracts after colon)
 
-**Snipping Flow:**
-1. User clicks menu bar icon → `AppDelegate.startSnipping()`
-2. Check pix2tex installed → Check permissions (Accessibility + Screen Recording)
-3. Create `OverlayPanel` with CGEvent tap
-4. User drags selection → `handleSelection()` called with NSRect
-5. Hide overlay → `captureScreenRegion()` using ScreenCaptureKit
-6. Crop to selection, save PNG to temp
-7. Run `pix2tex <imagepath>`, parse output (format: "path: latex_result")
-8. Copy LaTeX to clipboard
-9. Show `PreviewPanel` with rendered equation
+**Texo** (high quality)
+- Better accuracy, uses FormulaNet model
+- Persistent daemon for performance
+- Socket-based IPC (`/tmp/mathsnip_texo.sock`)
+- Non-blocking startup: daemon boots in background, waits for "READY" signal on stdout
+- Falls back to single-shot inference if daemon unavailable
+- Setup via `./scripts/setup_texo.sh`
 
-**Coordinate System Handling:**
-- CGEvent/ScreenCaptureKit use CG coordinates (origin top-left, Y down)
-- NSWindow/NSView use NS coordinates (origin bottom-left, Y up)
-- `OverlayPanel` converts between systems when handling events
-- Screen capture crops using CG coordinates with proper Y-axis inversion
+Backend is set via `let activeBackend: LaTeXBackend` in AppDelegate.swift:13
 
-**Preview Rendering:**
-- HTML template at `assets/preview.html` has `{{LATEX}}` placeholder
-- Swift escapes LaTeX string for JavaScript (backslashes, quotes, newlines)
-- Template + KaTeX assets copied to cache directory
-- WebView loads from file URL with read access to cache dir
-- Auto-scales rendered equation to fit panel dimensions
+### Texo Daemon Details
 
-## Important Implementation Details
+When `activeBackend = .texo`:
+- App starts daemon in background on launch without blocking
+- Python script `scripts/inference_texo.py` runs with `--server` flag
+- App waits for daemon readiness only when snipping (max 120s timeout)
+- Daemon monitors via `texoDaemonReady` flag and condition variable
+- Socket connection sends image path, receives LaTeX
+- Automatic cleanup of stale socket/PID files on restart
 
-### Permission Requirements
-Both macOS permissions are strictly required and checked before snipping:
-- **Accessibility**: Required for CGEvent tap to intercept mouse/keyboard
-- **Screen Recording**: Required for ScreenCaptureKit to capture screen region
-- Moving the app to a new location (e.g., to `/Applications`) invalidates permissions
+## Key Development Notes
 
-### Event Tap Behavior
-- Event tap can be disabled by system if callback takes too long
-- Code handles `.tapDisabledByTimeout` by re-enabling tap
-- All events consumed during snipping to prevent interference with other apps
+### Threading
+- Event handling in CGEvent tap runs on system event thread (must not block)
+- Main UI updates dispatched to main thread via `DispatchQueue.main.async`
+- Asynchronous capture/processing via Task/async-await
 
-### Window Level Configuration
-- Overlay must be configured (`configureForOverlay()`) BEFORE showing
-- This ensures window covers menubar from first frame (prevents flicker)
+### Coordinate Systems
+- CG coordinates: origin top-left, Y increases downward
+- NS coordinates: origin bottom-left, Y increases upward
+- OverlayView converts between systems in `viewPointFromScreenPoint()`
+- Screenshot scaling accounts for Retina displays via `backingScaleFactor`
 
-### Asset Management
-- Icons loaded from bundle: `icon.png`, `icon@2x.png`, `AppIcon.icns`
-- Preview assets: `preview.html`, `katex.min.css`, `katex.min.js`, `fonts/` directory
-- All assets must be in app bundle's Resources directory after build
+### Screen Capture
+- Uses ScreenCaptureKit (macOS 13.2+)
+- Captures full display, then crops to selection rect
+- Scaling applied based on display backing scale factor
+- Temporary PNG files cleaned up after processing
+
+### Permissions
+- Accessibility: required for event tap
+- Screen Recording: required for ScreenCaptureKit
+- App prompts user and opens System Settings if missing
+- Note: macOS treats app in different locations as separate, requiring re-grant
+
+### Preview Panel
+- Resources (CSS, JS, fonts) embedded in app bundle
+- Copies to temp cache directory on each preview for security
+- KaTeX renders LaTeX, tex2typst converts to Typst
+- Dismisses on any click outside via local/global event monitors
+
+## Asset Organization
+
+- `assets/icon.png` & `icon@2x.png` - Menu bar icons
+- `assets/AppIcon.icns` - App icon
+- `assets/preview.html` - Preview panel template (has `{{LATEX}}` placeholder)
+- `assets/katex.min.css` & `katex.min.js` - Math rendering
+- `assets/tex2typst.min.js` - LaTeX to Typst conversion
+- `assets/fonts/` - KaTeX fonts
+
+## Common Tasks
+
+### Switch Backend
+Edit `AppDelegate.swift:13`: change `activeBackend` to `.pix2tex` or `.texo`
+
+### Add New Backend
+1. Add case to `LaTeXBackend` enum (AppDelegate.swift:7)
+2. Implement backend check in `startSnipping()` (AppDelegate.swift:499)
+3. Implement run function and call from `captureAndProcess()` (AppDelegate.swift:561)
+4. Add permission/setup checks
+
+### Modify Overlay Appearance
+Edit `OverlayView.draw()` method (OverlayPanel.swift:249)
+- Colors, transparency, border style
+- Crosshair rendering
+
+### Update Preview Format
+Edit `assets/preview.html` template and ensure resources are copied in `PreviewPanel.showBelow()` (PreviewPanel.swift:92)
+
+## Dependencies
+
+- **macOS SDK**: Cocoa, ScreenCaptureKit, WebKit, ApplicationServices
+- **Swift**: No external package manager (single-file compilation)
+- **Backends**: pix2tex (pip), Texo (setup_texo.sh with uv)
+
+## License
+
+MIT except `scripts/inference_texo.py` which is AGPL-3.0 (imports Texo)
