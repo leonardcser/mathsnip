@@ -60,6 +60,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Snip", action: #selector(snipMenuClicked), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "GitHub", action: #selector(githubMenuClicked), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitMenuClicked), keyEquivalent: "q"))
         statusItem.menu = nil // We'll show it manually on right-click
 
@@ -245,6 +246,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func snipMenuClicked() {
         if isProcessing { return }
         startSnipping()
+    }
+
+    @objc func githubMenuClicked() {
+        if let url = URL(string: "https://github.com/leonardcser/mathsnip") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     @objc func quitMenuClicked() {

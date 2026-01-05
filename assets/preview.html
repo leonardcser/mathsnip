@@ -83,6 +83,11 @@
       .copy-row.copied .copy-btn svg {
         color: white;
       }
+      .copy-row.disabled {
+        opacity: 0.4;
+        pointer-events: none;
+        cursor: not-allowed;
+      }
       .copy-content {
         flex: 1;
         padding: 0 10px;
@@ -91,9 +96,12 @@
         font-size: 12px;
         color: #374151;
         white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        overflow-x: auto;
+        overflow-y: hidden;
         line-height: 26px;
+      }
+      .copy-content::-webkit-scrollbar {
+        display: none;
       }
       .copy-btn {
         display: flex;
@@ -141,13 +149,16 @@
           "$$" + latex + "$$";
 
         // Convert to Typst
+        const typstRow = document.querySelector('.copy-row[title*="Typst"]');
         try {
           const typst = tex2typst(latex);
           document.getElementById("typst-content").textContent =
             "$" + typst + "$";
+          typstRow.classList.remove("disabled");
         } catch (e) {
           document.getElementById("typst-content").textContent =
-            "(conversion failed)";
+            "conversion failed";
+          typstRow.classList.add("disabled");
         }
 
         scaleToFit();
@@ -158,19 +169,29 @@
         const equationArea = document.querySelector(".equation-area");
         if (!container || !equationArea) return;
 
-        const maxW = equationArea.clientWidth - 24;
-        const maxH = equationArea.clientHeight - 24;
+        // Measure offscreen at natural size
+        container.style.visibility = "hidden";
+        container.style.position = "absolute";
+        container.style.transform = "none";
+
+        const maxW = equationArea.clientWidth - 48;
+        const maxH = equationArea.clientHeight - 32;
         const w = container.scrollWidth;
         const h = container.scrollHeight;
 
-        if (w > 0 && h > 0) {
-          const scale = Math.min(1.2, maxW / w, maxH / h);
-          container.style.transform = "scale(" + scale + ")";
-        }
+        // Calculate scale and apply
+        const scale = (w > 0 && h > 0) ? Math.min(1, maxW / w, maxH / h) : 1;
+        container.style.transform = "scale(" + scale + ")";
+
+        // Restore and show
+        container.style.position = "";
+        container.style.visibility = "";
         container.style.opacity = "1";
       }
 
       function copyRow(row) {
+        if (row.classList.contains("disabled")) return;
+
         const contentEl = row.querySelector(".copy-content");
         const button = row.querySelector(".copy-btn");
         const text = contentEl.textContent;
