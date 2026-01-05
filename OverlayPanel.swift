@@ -1,7 +1,10 @@
 import Cocoa
+import CoreGraphics
 
 class OverlayPanel: NSPanel {
     weak var appDelegate: AppDelegate?
+    private var eventTap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
 
     init(appDelegate: AppDelegate) {
         let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
@@ -15,13 +18,13 @@ class OverlayPanel: NSPanel {
 
         self.appDelegate = appDelegate
 
-        // Panel configuration
-        level = .screenSaver
+        // Panel configuration - use a very high level to be above menubar
+        level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
-        ignoresMouseEvents = false
-        acceptsMouseMovedEvents = true
+        ignoresMouseEvents = true  // We handle events via CGEvent tap
+        acceptsMouseMovedEvents = false
         isReleasedWhenClosed = false
 
         // Don't show in window switcher or mission control
@@ -33,14 +36,112 @@ class OverlayPanel: NSPanel {
         ]
 
         isFloatingPanel = true
-        becomesKeyOnlyIfNeeded = true
+        becomesKeyOnlyIfNeeded = false
 
         // Create overlay view
         let overlayView = OverlayView(frame: screenFrame)
         overlayView.overlayPanel = self
         contentView = overlayView
 
-        makeFirstResponder(overlayView)
+        setupEventTap()
+    }
+
+    private func setupEventTap() {
+        let eventMask: CGEventMask = (1 << CGEventType.mouseMoved.rawValue) |
+                                      (1 << CGEventType.leftMouseDown.rawValue) |
+                                      (1 << CGEventType.leftMouseDragged.rawValue) |
+                                      (1 << CGEventType.leftMouseUp.rawValue) |
+                                      (1 << CGEventType.keyDown.rawValue)
+
+        // Store self in a pointer to pass to the callback
+        let refcon = Unmanaged.passUnretained(self).toOpaque()
+
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: eventMask,
+            callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
+                guard let refcon = refcon else { return Unmanaged.passRetained(event) }
+                let panel = Unmanaged<OverlayPanel>.fromOpaque(refcon).takeUnretainedValue()
+                return panel.handleCGEvent(proxy: proxy, type: type, event: event)
+            },
+            userInfo: refcon
+        ) else {
+            print("Failed to create event tap. Check Accessibility permissions.")
+            return
+        }
+
+        eventTap = tap
+        runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+
+        if let source = runLoopSource {
+            CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
+        }
+
+        CGEvent.tapEnable(tap: tap, enable: true)
+    }
+
+    private func handleCGEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        guard let overlayView = contentView as? OverlayView else {
+            return Unmanaged.passRetained(event)
+        }
+
+        // Handle tap disabled (system can disable taps if they take too long)
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let tap = eventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+            }
+            return Unmanaged.passRetained(event)
+        }
+
+        let location = event.location  // Screen coordinates (CG coordinates, origin at top-left)
+
+        switch type {
+        case .mouseMoved:
+            overlayView.handleMouseMoved(screenPoint: location)
+            return nil  // Consume the event
+
+        case .leftMouseDown:
+            overlayView.handleMouseDown(screenPoint: location)
+            return nil
+
+        case .leftMouseDragged:
+            overlayView.handleMouseDragged(screenPoint: location)
+            return nil
+
+        case .leftMouseUp:
+            overlayView.handleMouseUp(screenPoint: location)
+            return nil
+
+        case .keyDown:
+            let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+            if keyCode == 53 {  // Escape
+                DispatchQueue.main.async {
+                    self.appDelegate?.cancelSnipping()
+                }
+                return nil
+            }
+            return nil  // Consume all keys during snipping
+
+        default:
+            return Unmanaged.passRetained(event)
+        }
+    }
+
+    func cleanup() {
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+        }
+        if let source = runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
+        }
+        eventTap = nil
+        runLoopSource = nil
+    }
+
+    deinit {
+        cleanup()
     }
 
     override var canBecomeKey: Bool { true }
@@ -56,28 +157,78 @@ class OverlayView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-
-        let trackingArea = NSTrackingArea(
-            rect: bounds,
-            options: [.mouseMoved, .activeAlways, .inVisibleRect],
-            owner: self,
-            userInfo: nil
-        )
-        addTrackingArea(trackingArea)
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) not implemented")
     }
 
+    // Convert CG screen coordinates (origin top-left) to view coordinates (origin bottom-left)
+    private func viewPointFromScreenPoint(_ cgPoint: CGPoint) -> NSPoint {
+        guard let screen = NSScreen.main else { return NSPoint(x: cgPoint.x, y: cgPoint.y) }
+        // CG coordinates: origin at top-left, Y increases downward
+        // NS coordinates: origin at bottom-left, Y increases upward
+        let nsScreenPoint = NSPoint(x: cgPoint.x, y: screen.frame.height - cgPoint.y)
+        return nsScreenPoint
+    }
+
+    func handleMouseMoved(screenPoint: CGPoint) {
+        currentPoint = viewPointFromScreenPoint(screenPoint)
+        DispatchQueue.main.async {
+            self.needsDisplay = true
+        }
+    }
+
+    func handleMouseDown(screenPoint: CGPoint) {
+        let point = viewPointFromScreenPoint(screenPoint)
+        startPoint = point
+        currentPoint = point
+        isSelecting = true
+        DispatchQueue.main.async {
+            self.needsDisplay = true
+        }
+    }
+
+    func handleMouseDragged(screenPoint: CGPoint) {
+        if isSelecting {
+            currentPoint = viewPointFromScreenPoint(screenPoint)
+            DispatchQueue.main.async {
+                self.needsDisplay = true
+            }
+        }
+    }
+
+    func handleMouseUp(screenPoint: CGPoint) {
+        if isSelecting {
+            isSelecting = false
+            let rect = selectionRect
+
+            if rect.width >= 10 && rect.height >= 10 {
+                // The rect is already in view/screen coordinates (NS coordinates)
+                let screenRect = NSRect(
+                    x: rect.origin.x,
+                    y: rect.origin.y,
+                    width: rect.width,
+                    height: rect.height
+                )
+                DispatchQueue.main.async {
+                    self.overlayPanel?.appDelegate?.handleSelection(screenRect)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.overlayPanel?.appDelegate?.cancelSnipping()
+                }
+            }
+        }
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
 
         // Initialize crosshair at current mouse position
-        if let window = window {
-            let mouseLocation = NSEvent.mouseLocation
-            let windowPoint = window.convertPoint(fromScreen: mouseLocation)
-            currentPoint = convert(windowPoint, from: nil)
+        if NSScreen.main != nil {
+            let cgMouseLocation = CGEvent(source: nil)?.location ?? .zero
+            currentPoint = viewPointFromScreenPoint(cgMouseLocation)
             needsDisplay = true
         }
     }
@@ -127,49 +278,4 @@ class OverlayView: NSView {
         let height = abs(currentPoint.y - startPoint.y)
         return NSRect(x: x, y: y, width: width, height: height)
     }
-
-    override func mouseDown(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        startPoint = point
-        currentPoint = point
-        isSelecting = true
-        needsDisplay = true
-    }
-
-    override func mouseDragged(with event: NSEvent) {
-        if isSelecting {
-            currentPoint = convert(event.locationInWindow, from: nil)
-            needsDisplay = true
-        }
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        if isSelecting {
-            isSelecting = false
-            let rect = selectionRect
-
-            if rect.width >= 10 && rect.height >= 10 {
-                // Convert to screen coordinates
-                let windowRect = convert(rect, to: nil)
-                let screenRect = window?.convertToScreen(windowRect) ?? rect
-                overlayPanel?.appDelegate?.handleSelection(screenRect)
-            } else {
-                overlayPanel?.appDelegate?.cancelSnipping()
-            }
-        }
-    }
-
-    override func mouseMoved(with event: NSEvent) {
-        currentPoint = convert(event.locationInWindow, from: nil)
-        needsDisplay = true
-    }
-
-    override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 { // Escape
-            overlayPanel?.appDelegate?.cancelSnipping()
-        }
-    }
-
-    override var acceptsFirstResponder: Bool { true }
-    override func becomeFirstResponder() -> Bool { true }
 }
