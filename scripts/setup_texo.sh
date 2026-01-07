@@ -47,9 +47,22 @@ uv venv "$VENV_DIR" --python 3.12
 # Install dependencies manually (Texo's pyproject.toml requires onnxruntime-gpu which isn't available on macOS)
 # Versions from Texo pyproject.toml
 echo "Installing dependencies (this may take a while on first run)..."
+
+# Detect architecture - PyTorch 2.3+ dropped Intel Mac support
+ARCH=$(uname -m)
+if [ "$ARCH" = "x86_64" ]; then
+    echo "Detected Intel Mac (x86_64) - using PyTorch 2.2.2 (last version with Intel Mac support)"
+    TORCH_VERSION="torch==2.2.2"
+    TORCHVISION_VERSION="torchvision==0.17.2"
+else
+    echo "Detected Apple Silicon ($ARCH) - using PyTorch 2.7.0"
+    TORCH_VERSION="torch==2.7.0"
+    TORCHVISION_VERSION="torchvision>=0.20.1"
+fi
+
 uv pip install --python "$VENV_DIR/bin/python" \
-    "torch==2.7.0" \
-    "torchvision>=0.20.1" \
+    "$TORCH_VERSION" \
+    "$TORCHVISION_VERSION" \
     "transformers==4.40.0" \
     "pillow>=11.1.0" \
     huggingface_hub \
