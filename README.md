@@ -20,8 +20,9 @@ different formats (LaTeX and Typst).
 Download the latest release for your architecture from the
 [releases page](https://github.com/leonardcser/mathsnip/releases):
 
-- `MathSnip-arm64.zip` for Apple Silicon Macs
-- `MathSnip-x86_64.zip` for Intel Macs
+- `MathSnip-v{version}-arm64.zip` for Apple Silicon Macs
+- `MathSnip-v{version}-x86_64.zip` for Intel Macs
+- `checksums.txt` contains SHA256 checksums for verification
 
 Extract the zip and move `MathSnip.app` to your Applications folder.
 
@@ -41,6 +42,8 @@ cd mathsnip
 make setup    # First time only - set up backend
 make install  # Build and install to /Applications
 ```
+
+**Note:** Version is derived from git tags. Development builds will show version like `0.1.0-5-g1234abc` (5 commits after v0.1.0 tag).
 
 ### Advanced Usage
 
