@@ -26,7 +26,8 @@ Download the latest release for your architecture from the
 
 Extract the zip and move `MathSnip.app` to your Applications folder.
 
-**Note:** If macOS shows a "damaged app" warning, run this command in Terminal:
+**Note:** If macOS shows a "damaged app" warning, disable Apple Quarantine by
+running this command in Terminal:
 
 ```bash
 xattr -cr /Applications/MathSnip.app
@@ -43,7 +44,8 @@ make setup    # First time only - set up backend
 make install  # Build and install to /Applications
 ```
 
-**Note:** Version is derived from git tags. Development builds will show version like `0.1.0-5-g1234abc` (5 commits after v0.1.0 tag).
+**Note:** Version is derived from git tags. Development builds will show version
+like `0.1.0-5-g1234abc` (5 commits after v0.1.0 tag).
 
 ### Advanced Usage
 
