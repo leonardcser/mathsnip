@@ -17,7 +17,7 @@ import signal
 from pathlib import Path
 
 # Add Texo to path for custom model code
-BACKEND_DIR = Path.home() / ".mathsnip" / "texo"
+BACKEND_DIR = Path.home() / ".mathsnip" / "backends" / "texo"
 TEXO_PATH = BACKEND_DIR / "Texo"
 sys.path.insert(0, str(TEXO_PATH / "src"))
 
@@ -69,6 +69,43 @@ def load_model():
     return model, tokenizer, image_processor, device
 
 
+def format_latex(latex: str) -> str:
+    r"""
+    Format LaTeX string by removing unnecessary spaces.
+    Matches the logic from texo-web's formatLatex function.
+
+    Rules:
+    - Remove all spaces between tokens
+    - Only add space after LaTeX commands (starting with \) when followed by alphanumeric
+    - Add newline after \\
+    """
+    if not latex:
+        return ""
+
+    # Split by whitespace to get tokens
+    tokens = latex.split()
+    if not tokens:
+        return ""
+
+    new_tokens = []
+    for i in range(len(tokens) - 1):
+        token = tokens[i]
+        next_token = tokens[i + 1]
+        new_tokens.append(token)
+
+        if token == '\\\\':
+            # Add newline after line break
+            new_tokens.append('\n')
+        elif token.startswith('\\') and next_token and next_token[0].isalnum():
+            # Add space after LaTeX command if followed by alphanumeric
+            new_tokens.append(' ')
+
+    # Add the last token
+    new_tokens.append(tokens[-1])
+
+    return ''.join(new_tokens)
+
+
 def inference(image_path: str, model, tokenizer, image_processor, device) -> str:
     """Run inference on an image and return LaTeX string."""
     image = Image.open(image_path).convert("RGB")
@@ -85,6 +122,10 @@ def inference(image_path: str, model, tokenizer, image_processor, device) -> str
         )
 
     latex = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+
+    # Format LaTeX to remove unnecessary spaces
+    latex = format_latex(latex)
+
     return latex
 
 
@@ -190,8 +231,8 @@ def main():
         latex = inference(image_path, model, tokenizer, image_processor, device)
         print(latex)
     else:
-        print("Usage: inference_texo.py --server  (daemon mode)", file=sys.stderr)
-        print("       inference_texo.py <image_path>  (single inference)", file=sys.stderr)
+        print("Usage: inference.py --server  (daemon mode)", file=sys.stderr)
+        print("       inference.py <image_path>  (single inference)", file=sys.stderr)
         sys.exit(1)
 
 

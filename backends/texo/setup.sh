@@ -6,7 +6,7 @@
 
 set -e
 
-MATHSNIP_DIR="$HOME/.mathsnip/texo"
+MATHSNIP_DIR="$HOME/.mathsnip/backends/texo"
 VENV_DIR="$MATHSNIP_DIR/venv"
 TEXO_DIR="$MATHSNIP_DIR/Texo"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -77,7 +77,7 @@ uv pip install --python "$VENV_DIR/bin/python" \
 
 # Copy inference script
 echo "Installing inference script..."
-cp "$SCRIPT_DIR/inference_texo.py" "$MATHSNIP_DIR/inference_texo.py"
+cp "$SCRIPT_DIR/inference.py" "$MATHSNIP_DIR/inference.py"
 
 # Pre-download the model
 echo ""
@@ -88,7 +88,7 @@ sys.path.insert(0, '$TEXO_DIR')
 from pathlib import Path
 from huggingface_hub import snapshot_download
 
-cache_dir = Path.home() / '.mathsnip' / 'texo' / 'model_cache'
+cache_dir = Path.home() / '.mathsnip' / 'backends' / 'texo' / 'model_cache'
 cache_dir.mkdir(parents=True, exist_ok=True)
 
 print('Downloading FormulaNet model...')
@@ -107,4 +107,4 @@ echo ""
 echo "Files installed:"
 echo "  - $VENV_DIR (Python environment)"
 echo "  - $TEXO_DIR (Texo source code)"
-echo "  - $MATHSNIP_DIR/inference_texo.py (inference script)"
+echo "  - $MATHSNIP_DIR/inference.py (inference script)"

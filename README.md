@@ -15,16 +15,25 @@ different formats (LaTeX and Typst).
 
 ## Setup
 
+Build and install MathSnip using the Makefile:
+
 ```bash
-./build.sh
+make setup    # First time only - set up backend
+make install  # Build and install to /Applications
 ```
 
-This creates `MathSnip.app` in the current directory.
-
-To install the application run:
+### Advanced Usage
 
 ```bash
-cp -R MathSnip.app /Applications/
+# Build with a different backend
+make BACKEND=texo install
+make BACKEND=pix2tex install
+
+# Clean build artifacts
+make clean
+
+# Show all available commands
+make help
 ```
 
 ## Usage
@@ -60,17 +69,38 @@ entry from the permission lists and add the app again from its new location.
 
 ## Backends
 
-| Backend            | License | Quality   | Setup                     |
-| ------------------ | ------- | --------- | ------------------------- |
-| **Texo** (default) | AGPL    | Excellent | `./scripts/setup_texo.sh` |
-| **pix2tex**        | MIT     | Good      | `uv tool install pix2tex` |
+| Backend                   | Quality   | Speed  | Setup                          |
+| ------------------------- | --------- | ------ | ------------------------------ |
+| **Texo-CoreML** (default) | Excellent | Fast   | `make install`                 |
+| **Texo**                  | Excellent | Medium | `make BACKEND=texo install`    |
+| **pix2tex**               | Fair      | Fast   | `make BACKEND=pix2tex install` |
 
-To use **pix2tex**, change `let activeBackend: LaTeXBackend = .texo` to
-`.pix2tex` in `AppDelegate.swift` and rebuild.
+The default backend is **Texo-CoreML**, which provides the best accuracy using
+on-device inference via Apple's CoreML framework.
 
-Note: Using Texo subjects your use to AGPL-3.0.
+To switch backends, use the `BACKEND` variable with make:
+
+```bash
+make BACKEND=texo install        # Use Texo
+make BACKEND=pix2tex install     # Use pix2tex
+```
+
+You can also change the default by editing the `BACKEND` variable at the top of
+the `Makefile`.
+
+**Note:** Using the Texo backend (not Texo-CoreML) subjects your use to AGPL-3.0
+license terms.
+
+## Acknowledgments
+
+MathSnip uses [Texo](https://github.com/alephpi/Texo) for mathematical equation
+recognition via the FormulaNet model.
 
 ## License
 
-MIT License, except `scripts/inference_texo.py` which is AGPL-3.0 (it imports
-from [Texo](https://github.com/alephpi/Texo), an AGPL project).
+MIT License, except the following files which are AGPL-3.0 (they import from or
+are derived from [Texo](https://github.com/alephpi/Texo), an AGPL project):
+
+- `backends/texo/inference.py`
+- `backends/texo-coreml/CoreMLInference.swift`
+- `backends/texo-coreml/MathSnipTokenizer.swift`

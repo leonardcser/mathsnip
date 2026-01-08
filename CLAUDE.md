@@ -8,17 +8,30 @@ MathSnip is a macOS menu bar application that converts mathematical equations to
 
 ## Building and Running
 
-### Build
+### Build with Makefile
 ```bash
-./build.sh
+make setup                # First time: set up backend (default: texo-coreml)
+make install              # Build and install to /Applications
+make build                # Build only (no install)
+make clean                # Clean build artifacts
+make help                 # Show all commands
 ```
 
-Creates `MathSnip.app` in the current directory.
-
-### Install
+Or with a specific backend:
 ```bash
-cp -R MathSnip.app /Applications/
+make BACKEND=texo setup && make install
+make BACKEND=pix2tex setup && make install
 ```
+
+The Makefile handles:
+- Backend selection via `BACKEND` variable (texo-coreml, texo, pix2tex)
+- Running appropriate setup scripts per backend (`make setup`)
+- Generating `BackendConfig.swift` with selected backend
+- Creating app bundle structure
+- Copying assets and resources
+- Bundling CoreML models (for texo-coreml backend)
+- Compiling Swift code
+- Installing to /Applications
 
 ### Run
 Click the MathSnip menu bar icon to start snipping, or right-click for the context menu.
@@ -30,8 +43,9 @@ Click the MathSnip menu bar icon to start snipping, or right-click for the conte
 **AppDelegate.swift** - Main application controller
 - Status bar menu management
 - Snipping flow orchestration (`startSnipping()` → `handleSelection()` → `captureAndProcess()`)
-- Backend abstraction and switching between pix2tex and Texo
+- Backend abstraction and switching between Texo-CoreML, Texo, and pix2tex
 - Texo daemon lifecycle management (non-blocking startup, socket-based communication)
+- CoreML model loading and inference
 - Permission checking (Accessibility, Screen Recording)
 - Screenshot capture using ScreenCaptureKit with scaling and cropping
 
@@ -51,33 +65,57 @@ Click the MathSnip menu bar icon to start snipping, or right-click for the conte
 
 ### Backend System
 
-Two ML backends for equation recognition:
+Three ML backends for equation recognition, located in `backends/` directory:
 
-**Texo** (default)
-- Better accuracy, uses FormulaNet model
+**Texo-CoreML** (`backends/texo-coreml/`, default)
+- Best accuracy, uses FormulaNet model converted to CoreML
+- On-device inference using Apple Neural Engine (ANE)
+- Fast inference after initial model load
+- Models bundled in app (`Encoder.mlpackage`, `Decoder.mlpackage`)
+- Swift implementation with beam search decoding
+- Setup: `cd backends/texo-coreml && ./setup.sh` (automatically exports CoreML models)
+- Files: `CoreMLInference.swift`, `MathSnipTokenizer.swift`, `export_coreml.py`, `setup.sh`
+
+**Texo** (`backends/texo/`)
+- Good accuracy, uses FormulaNet model via Python
 - Persistent daemon for performance
 - Socket-based IPC (`/tmp/mathsnip_texo.sock`)
 - Non-blocking startup: daemon boots in background, waits for "READY" signal on stdout
 - Falls back to single-shot inference if daemon unavailable
-- Setup via `./scripts/setup_texo.sh`
+- Setup: `cd backends/texo && ./setup.sh`
+- Files: `inference.py`, `setup.sh`
 
 **pix2tex**
 - Lightweight, fast
 - External tool: `pix2tex [image]`
 - Paths searched: `~/.local/bin/pix2tex`, `/usr/local/bin/pix2tex`, `/opt/homebrew/bin/pix2tex`
 - Output format: `"filepath: latex_result"` (parser extracts after colon)
+- Install: `uv tool install pix2tex`
 
-Backend is set via `let activeBackend: LaTeXBackend` in AppDelegate.swift:13
+Backend is set via `let activeBackend: LaTeXBackend` in AppDelegate.swift:14
+
+**Note:** The backends are ordered by recommendation: Texo-CoreML (best accuracy, on-device), Texo (good accuracy, Python daemon), pix2tex (lightweight, external tool).
 
 ### Texo Daemon Details
 
 When `activeBackend = .texo`:
 - App starts daemon in background on launch without blocking
-- Python script `scripts/inference_texo.py` runs with `--server` flag
+- Python script `backends/texo/inference.py` runs with `--server` flag
 - App waits for daemon readiness only when snipping (max 120s timeout)
 - Daemon monitors via `texoDaemonReady` flag and condition variable
 - Socket connection sends image path, receives LaTeX
 - Automatic cleanup of stale socket/PID files on restart
+
+### CoreML Backend Details
+
+When `activeBackend = .texoCoreml`:
+- Models loaded on app launch using `CoreMLInference` class
+- Encoder processes image (384×384 grayscale, normalized)
+- Image preprocessing: margin cropping, aspect-ratio preserving resize with padding
+- Decoder uses beam search (width=4, max length=512) for better accuracy
+- Uses `MathSnipTokenizer` with embedded FormulaNet vocabulary
+- Inference runs on ANE/GPU/CPU based on availability
+- No external dependencies at runtime (models bundled in app)
 
 ## Key Development Notes
 
@@ -122,13 +160,33 @@ When `activeBackend = .texo`:
 ## Common Tasks
 
 ### Switch Backend
-Edit `AppDelegate.swift:13`: change `activeBackend` to `.pix2tex` or `.texo`
+Use the Makefile with the `BACKEND` variable:
+```bash
+make BACKEND=texo-coreml install  # Default
+make BACKEND=texo install         # Texo Python backend
+make BACKEND=pix2tex install      # pix2tex
+```
+
+Or edit the `BACKEND` variable at the top of the `Makefile` to change the default.
 
 ### Add New Backend
-1. Add case to `LaTeXBackend` enum (AppDelegate.swift:7)
-2. Implement backend check in `startSnipping()` (AppDelegate.swift:499)
-3. Implement run function and call from `captureAndProcess()` (AppDelegate.swift:561)
-4. Add permission/setup checks
+1. Create backend directory in `backends/` (e.g., `backends/my-backend/`)
+2. Add case to `LaTeXBackend` enum in `AppDelegate.swift`
+3. Add backend case to Makefile `setup` target
+4. Add backend case to Makefile `build` target for `BackendConfig.swift` generation
+5. Implement backend check in `startSnipping()` in `AppDelegate.swift`
+6. Implement run function and call from `captureAndProcess()` in `AppDelegate.swift`
+7. Add permission/setup checks and error alerts
+8. Add setup script in backend directory
+
+### Setup Backends
+**Texo-CoreML**: `cd backends/texo-coreml && ./setup.sh`
+- Automatically exports CoreML models to `../../models/` directory
+- Models are bundled into the app during build
+
+**Texo**: `cd backends/texo && ./setup.sh`
+
+**pix2tex**: `uv tool install pix2tex`
 
 ### Modify Overlay Appearance
 Edit `OverlayView.draw()` method (OverlayPanel.swift:249)
@@ -140,10 +198,37 @@ Edit `assets/preview.html` template and ensure resources are copied in `PreviewP
 
 ## Dependencies
 
-- **macOS SDK**: Cocoa, ScreenCaptureKit, WebKit, ApplicationServices
+- **macOS SDK**: Cocoa, ScreenCaptureKit, WebKit, CoreML, ApplicationServices
 - **Swift**: No external package manager (single-file compilation)
-- **Backends**: pix2tex (pip), Texo (setup_texo.sh with uv)
+- **Backends**:
+  - Texo-CoreML: CoreML export via Python (`backends/texo-coreml/setup.sh` - includes model export)
+  - Texo: Python backend with setup script (`backends/texo/setup.sh`)
+  - pix2tex: External Python package (`uv tool install pix2tex`)
+
+## File Organization
+
+```
+mathsnip/
+├── backends/
+│   ├── texo/                 # Texo Python backend
+│   │   ├── inference.py      # Inference script with daemon mode
+│   │   └── setup.sh          # Setup script (clones Texo, downloads model)
+│   └── texo-coreml/          # CoreML backend
+│       ├── CoreMLInference.swift    # CoreML inference engine
+│       ├── MathSnipTokenizer.swift  # Tokenizer with embedded vocab
+│       ├── export_coreml.py         # Model export script
+│       ├── setup.sh                 # Setup script (clones Texo, downloads model)
+│       ├── pyproject.toml           # Python dependencies
+│       └── .gitignore               # Ignores .venv/, Texo/, model_cache/
+├── assets/                   # App resources (icons, preview template, KaTeX)
+├── AppDelegate.swift         # Main app logic
+├── OverlayPanel.swift        # Selection overlay
+├── PreviewPanel.swift        # LaTeX preview window
+├── main.swift                # Entry point
+├── Makefile                  # Build system
+└── CLAUDE.md                 # This file
+```
 
 ## License
 
-MIT except `scripts/inference_texo.py` which is AGPL-3.0 (imports Texo)
+MIT except `backends/texo/inference.py` which is AGPL-3.0 (imports Texo)

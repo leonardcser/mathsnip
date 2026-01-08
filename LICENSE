@@ -22,6 +22,12 @@ SOFTWARE.
 
 ---
 
-Exception: scripts/inference_texo.py is licensed under AGPL-3.0-only because
-it imports from Texo (https://github.com/alephpi/Texo), which is AGPL-licensed.
-See that file for its license header.
+Exception: The following files are licensed under AGPL-3.0-only because they
+import from or are derived from Texo (https://github.com/alephpi/Texo), which
+is AGPL-licensed:
+
+- backends/texo/inference.py
+- backends/texo-coreml/CoreMLInference.swift
+- backends/texo-coreml/MathSnipTokenizer.swift
+
+See each file for its license header.
