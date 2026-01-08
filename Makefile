@@ -4,6 +4,7 @@
 # Configuration
 BACKEND ?= texo-coreml
 ARCH ?= $(shell uname -m)
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || echo "dev")
 APP_NAME = MathSnip
 APP_BUNDLE = $(APP_NAME).app
 MODELS_DIR = models
@@ -94,7 +95,9 @@ endif
 		backends/texo-coreml/MathSnipTokenizer.swift \
 		backends/texo-coreml/CoreMLInference.swift
 	@cp Info.plist $(APP_BUNDLE)/Contents/
-	@echo "✓ Built $(APP_BUNDLE) with backend: $(BACKEND)"
+	@/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(VERSION)" $(APP_BUNDLE)/Contents/Info.plist
+	@/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(VERSION)" $(APP_BUNDLE)/Contents/Info.plist
+	@echo "✓ Built $(APP_BUNDLE) v$(VERSION) with backend: $(BACKEND)"
 
 install: build
 	@cp -R $(APP_BUNDLE) /Applications/

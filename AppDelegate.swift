@@ -62,6 +62,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Create menu for right-click
         let menu = NSMenu()
+
+        // Add version info
+        if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
+            let versionItem = NSMenuItem(title: "MathSnip v\(version)", action: nil, keyEquivalent: "")
+            versionItem.isEnabled = false
+            menu.addItem(versionItem)
+            menu.addItem(NSMenuItem.separator())
+        }
+
         menu.addItem(NSMenuItem(title: "Snip", action: #selector(snipMenuClicked), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "GitHub", action: #selector(githubMenuClicked), keyEquivalent: ""))
