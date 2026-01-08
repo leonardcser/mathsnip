@@ -13,11 +13,31 @@ different formats (LaTeX and Typst).
 - Swift compiler
 - LaTeX backend (see **Backends** section below)
 
-## Setup
+## Installation
 
-Build and install MathSnip using the Makefile:
+### Download Pre-built Release
+
+Download the latest release for your architecture from the
+[releases page](https://github.com/leonardcser/mathsnip/releases):
+
+- `MathSnip-arm64.zip` for Apple Silicon Macs
+- `MathSnip-x86_64.zip` for Intel Macs
+
+Extract the zip and move `MathSnip.app` to your Applications folder.
+
+**Note:** If macOS shows a "damaged app" warning, run this command in Terminal:
 
 ```bash
+xattr -cr /Applications/MathSnip.app
+```
+
+### Build from Source
+
+Clone the repository and build using the Makefile:
+
+```bash
+git clone https://github.com/leonardcser/mathsnip.git
+cd mathsnip
 make setup    # First time only - set up backend
 make install  # Build and install to /Applications
 ```
