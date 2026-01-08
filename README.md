@@ -9,7 +9,7 @@ different formats (LaTeX and Typst).
 
 ## Requirements
 
-- macOS 13.0 or later
+- macOS 14.0 or later
 - Swift compiler
 - LaTeX backend (see **Backends** section below)
 

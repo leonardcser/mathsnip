@@ -12,7 +12,6 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        backend: [texo-coreml, texo, pix2tex]
         arch: [arm64, x86_64]
 
     steps:
@@ -31,22 +30,22 @@ jobs:
 
       - name: Setup backend
         run: |
-          make BACKEND=${{ matrix.backend }} ARCH=${{ matrix.arch }} setup
+          make ARCH=${{ matrix.arch }} setup
 
       - name: Build app
         run: |
-          make BACKEND=${{ matrix.backend }} ARCH=${{ matrix.arch }} build
+          make ARCH=${{ matrix.arch }} build
 
       - name: Create archive
         run: |
-          ARCHIVE_NAME="MathSnip-${{ matrix.backend }}-${{ matrix.arch }}.zip"
+          ARCHIVE_NAME="MathSnip-${{ matrix.arch }}.zip"
           ditto -c -k --keepParent MathSnip.app "$ARCHIVE_NAME"
           echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MathSnip-${{ matrix.backend }}-${{ matrix.arch }}
+          name: MathSnip-${{ matrix.arch }}
           path: ${{ env.ARCHIVE_NAME }}
           retention-days: 7
 

@@ -81,7 +81,7 @@ ifeq ($(BACKEND),texo-coreml)
 	fi
 endif
 	@swiftc -o $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME) \
-		-target $(ARCH)-apple-macosx13.0 \
+		-target $(ARCH)-apple-macosx14.0 \
 		-framework Cocoa \
 		-framework ScreenCaptureKit \
 		-framework WebKit \

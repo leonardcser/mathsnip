@@ -131,7 +131,7 @@ When `activeBackend = .texoCoreml`:
 - Screenshot scaling accounts for Retina displays via `backingScaleFactor`
 
 ### Screen Capture
-- Uses ScreenCaptureKit (macOS 13.2+)
+- Uses ScreenCaptureKit with SCScreenshotManager (macOS 14.0+)
 - Captures full display, then crops to selection rect
 - Scaling applied based on display backing scale factor
 - Temporary PNG files cleaned up after processing
