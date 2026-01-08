@@ -90,10 +90,14 @@ endif
 		BackendConfig.swift \
 		main.swift \
 		AppDelegate.swift \
+		StatusBarMenu.swift \
 		OverlayPanel.swift \
 		PreviewPanel.swift \
-		backends/texo-coreml/MathSnipTokenizer.swift \
-		backends/texo-coreml/CoreMLInference.swift
+		backends/pix2tex/Pix2TexBackend.swift \
+		backends/texo/TexoBackend.swift \
+		backends/texo-coreml/TexoCoreMLTokenizer.swift \
+		backends/texo-coreml/TexoCoreMLInference.swift \
+		backends/texo-coreml/TexoCoreMLBackend.swift
 	@cp Info.plist $(APP_BUNDLE)/Contents/
 	@/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(VERSION)" $(APP_BUNDLE)/Contents/Info.plist
 	@/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(VERSION)" $(APP_BUNDLE)/Contents/Info.plist

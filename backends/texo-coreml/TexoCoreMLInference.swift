@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// CoreMLInference.swift - CoreML-based equation recognition with beam search
+// TexoCoreMLInference.swift - CoreML-based equation recognition with beam search
 
 import CoreML
 import Foundation
@@ -33,17 +33,17 @@ struct Hypothesis: Comparable {
 
 // MARK: - CoreML Inference Engine
 
-class CoreMLInference {
+class TexoCoreMLInference {
     private var encoder: MLModel?
     private var decoder: MLModel?
-    private let tokenizer: MathSnipTokenizer
+    private let tokenizer: TexoCoreMLTokenizer
 
     // Beam search parameters
     let beamWidth: Int = 4
     let maxLength: Int = 512
 
     init() {
-        self.tokenizer = MathSnipTokenizer.formulaNet()
+        self.tokenizer = TexoCoreMLTokenizer.formulaNet()
     }
 
     /// Load CoreML models from the app bundle.
@@ -263,7 +263,7 @@ class CoreMLInference {
         // Initialize with BOS token
         var beams: [Hypothesis] = [
             Hypothesis(
-                tokens: [MathSnipTokenizer.bosTokenId],
+                tokens: [TexoCoreMLTokenizer.bosTokenId],
                 score: 0.0,
                 isComplete: false
             )
@@ -318,7 +318,7 @@ class CoreMLInference {
                     candidates.append(Hypothesis(
                         tokens: newTokens,
                         score: beam.score + logProb,
-                        isComplete: tokenId == MathSnipTokenizer.eosTokenId
+                        isComplete: tokenId == TexoCoreMLTokenizer.eosTokenId
                     ))
                 }
             }

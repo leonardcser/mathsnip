@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-// MathSnipTokenizer.swift - WordLevel tokenizer for LaTeX decoding
+// TexoCoreMLTokenizer.swift - WordLevel tokenizer for LaTeX decoding
 
 import Foundation
 
 /// A simple WordLevel tokenizer for decoding LaTeX tokens.
 /// This tokenizer splits on whitespace and maps tokens to IDs using a vocabulary.
-class MathSnipTokenizer {
+class TexoCoreMLTokenizer {
     // Special token IDs
     static let bosTokenId = 0
     static let padTokenId = 1
@@ -165,10 +165,10 @@ enum TokenizerError: Error, LocalizedError {
 
 // MARK: - Embedded Vocabulary (generated from vocab.json)
 
-extension MathSnipTokenizer {
+extension TexoCoreMLTokenizer {
     /// Create a tokenizer with the embedded FormulaNet vocabulary.
-    static func formulaNet() -> MathSnipTokenizer {
-        let tokenizer = MathSnipTokenizer()
+    static func formulaNet() -> TexoCoreMLTokenizer {
+        let tokenizer = TexoCoreMLTokenizer()
         tokenizer.loadVocabulary(from: embeddedVocab)
         return tokenizer
     }
