@@ -50,17 +50,11 @@ jobs:
           ditto -c -k --keepParent MathSnip.app "$ARCHIVE_NAME"
           echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
 
-      - name: Generate checksum
-        run: |
-          shasum -a 256 "${{ env.ARCHIVE_NAME }}" > "${{ env.ARCHIVE_NAME }}.sha256"
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: MathSnip-${{ matrix.arch }}
-          path: |
-            ${{ env.ARCHIVE_NAME }}
-            ${{ env.ARCHIVE_NAME }}.sha256
+          path: ${{ env.ARCHIVE_NAME }}
           retention-days: 7
 
   release:
@@ -77,18 +71,11 @@ jobs:
         with:
           path: artifacts
 
-      - name: Generate combined checksums
-        run: |
-          cd artifacts
-          find . -name "*.sha256" -exec cat {} \; > checksums.txt
-          cat checksums.txt
-
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             artifacts/**/*.zip
-            artifacts/checksums.txt
           draft: false
           prerelease: false
           generate_release_notes: true
