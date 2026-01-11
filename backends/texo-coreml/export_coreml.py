@@ -130,7 +130,7 @@ def export_encoder(model, output_dir: Path):
         outputs=[ct.TensorType(name="encoder_output", dtype=np.float32)],
         compute_units=ct.ComputeUnit.ALL,
         compute_precision=ct.precision.FLOAT32,
-        minimum_deployment_target=ct.target.macOS15,
+        minimum_deployment_target=ct.target.macOS14,
     )
 
     encoder_path = output_dir / "Encoder.mlpackage"
@@ -175,7 +175,7 @@ def export_decoder(model, output_dir: Path, max_seq_len: int = 512):
         exported,
         compute_units=ct.ComputeUnit.ALL,
         compute_precision=ct.precision.FLOAT32,
-        minimum_deployment_target=ct.target.macOS15,
+        minimum_deployment_target=ct.target.macOS14,
     )
 
     decoder_path = output_dir / "Decoder.mlpackage"
